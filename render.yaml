@@ -17,3 +17,15 @@ services:
         value: "56"
       - key: CORS_ORIGINS
         value: https://gigia1127520-gif.github.io
+      - key: ODDS_API_KEY
+        sync: false
+      - key: ODDS_BOOKMAKERS
+        value: draftkings,fanduel,betmgm,caesars
+      - key: ODDS_MARKETS
+        value: h2h,spreads,totals
+      - key: ODDS_CACHE_TTL_SECONDS
+        value: "900"
+      - key: ODDS_STALE_TTL_SECONDS
+        value: "3600"
+      - key: CRON_SECRET
+        sync: false
