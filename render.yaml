@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: diamondmind-api
+    runtime: python
+    plan: free
+    buildCommand: python -m zipfile -e diamondmind_backend.zip backend && pip install --upgrade pip && pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CACHE_TTL_SECONDS
+        value: "60"
+      - key: STALE_TTL_SECONDS
+        value: "1800"
+      - key: MIN_CONFIDENCE
+        value: "56"
+      - key: CORS_ORIGINS
+        value: https://gigia1127520-gif.github.io
