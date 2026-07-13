@@ -1,0 +1,38 @@
+name: DiamondMind Daily Predictions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 22 * * *"
+      timezone: "Asia/Taipei"
+    - cron: "17 0,5 * * *"
+      timezone: "Asia/Taipei"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diamondmind-daily-predictions
+  cancel-in-progress: false
+
+jobs:
+  run-daily-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate pick, refresh odds and settle records
+        env:
+          DIAMONDMIND_CRON_SECRET: ${{ secrets.DIAMONDMIND_CRON_SECRET }}
+          DIAMONDMIND_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          test -n "$DIAMONDMIND_CRON_SECRET"
+          API_URL="https://diamondmind-api.onrender.com/api/v1/jobs/daily"
+          if [ "$DIAMONDMIND_SCHEDULE" = "17 22 * * *" ]; then
+            TARGET_DATE="$(TZ=Asia/Taipei date --date=tomorrow +%F)"
+            API_URL="$API_URL?date=$TARGET_DATE"
+          fi
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-delay 10 --max-time 120 \
+            --request POST \
+            --header "X-DiamondMind-Cron: $DIAMONDMIND_CRON_SECRET" \
+            "$API_URL"
