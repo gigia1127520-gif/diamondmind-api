@@ -1,21 +1,9 @@
-name: DiamondMind 自動更新與結算
+name: DiamondMind Daily Predictions
 
 on:
   workflow_dispatch:
-
-  # 修改這個工作流程時，立刻執行一次結算測試
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/daily-predictions.yml"
-
   schedule:
-    # 每 20 分鐘結算一次（台灣時間）
-    - cron: "7,27,47 * * * *"
-      timezone: "Asia/Taipei"
-
-    # 原本每日預測排程（台灣時間）
+    # 台灣時間每日預測更新
     - cron: "17 22 * * *"
       timezone: "Asia/Taipei"
     - cron: "17 0,5 * * *"
@@ -24,56 +12,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: diamondmind-daily-predictions
+  cancel-in-progress: false
+
 jobs:
-  settle-recommendations:
-    name: 定時結算推薦
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'schedule' &&
-       github.event.schedule == '7,27,47 * * * *')
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    concurrency:
-      group: diamondmind-settlement
-      cancel-in-progress: false
-
-    steps:
-      - name: 喚醒並檢查 DiamondMind API
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl             --fail-with-body             --silent             --show-error             --retry 4             --retry-delay 15             --retry-all-errors             --max-time 180             "https://diamondmind-api.onrender.com/api/v1/health"
-
-      - name: 結算所有待處理推薦
-        shell: bash
-        env:
-          CRON_SECRET: ${{ secrets.DIAMONDMIND_CRON_SECRET }}
-        run: |
-          set -euo pipefail
-          test -n "$CRON_SECRET" || {
-            echo "缺少 DIAMONDMIND_CRON_SECRET"
-            exit 1
-          }
-
-          response=$(curl             --fail-with-body             --silent             --show-error             --retry 3             --retry-delay 10             --retry-all-errors             --max-time 180             --request POST             --header "X-DiamondMind-Cron: $CRON_SECRET"             "https://diamondmind-api.onrender.com/api/v1/jobs/settlement")
-
-          echo "$response"
-          echo "$response" | grep -q '"ok":true' || {
-            echo "結算端點未回傳 ok=true"
-            exit 1
-          }
-
   run-daily-job:
     name: 每日預測更新
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.schedule == '17 22 * * *' ||
-      github.event.schedule == '17 0,5 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    concurrency:
-      group: diamondmind-daily-predictions
-      cancel-in-progress: false
 
     steps:
       - name: Generate pick, refresh odds and settle records
