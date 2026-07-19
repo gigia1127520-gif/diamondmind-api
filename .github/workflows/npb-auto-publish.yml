@@ -3,22 +3,24 @@ name: DiamondMind NPB Auto Publish
 on:
   workflow_dispatch:
   schedule:
-    # GitHub cron uses UTC. 00:03-10:58 UTC = Taiwan 08:03-18:58.
-    # The API itself publishes only after entering the earliest-game final hour.
-    - cron: "3-58/5 0-10 * * *"
+    # GitHub cron uses UTC. Every 10 minutes from Taiwan 08:07-18:57.
+    # Odd minutes avoid GitHub's busiest top-of-hour scheduler queue.
+    # The API publishes only inside the one-hour window, with a small queue-delay grace.
+    - cron: "7,17,27,37,47,57 0-10 * * *"
 
 permissions:
   contents: read
 
 concurrency:
   group: diamondmind-npb-auto-publish
-  cancel-in-progress: true
+  # Never cancel a cold-start model build when the next scheduled check arrives.
+  cancel-in-progress: false
 
 jobs:
   check-npb-auto-publish:
     name: 日棒開賽前一小時自動發布檢查
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 12
 
     steps:
       - name: Publish eligible NPB free and Pro picks only when due
@@ -29,14 +31,28 @@ jobs:
           set -euo pipefail
           test -n "$DIAMONDMIND_CRON_SECRET"
 
+          # Wake Render first. Free instances can need around 50 seconds after sleep.
           curl \
+            --fail-with-body \
+            --show-error \
+            --silent \
+            --retry 4 \
+            --retry-delay 15 \
+            --retry-all-errors \
+            --max-time 180 \
+            "https://diamondmind-api.onrender.com/api/v1/health" >/dev/null
+
+          response=$(curl \
             --fail-with-body \
             --show-error \
             --silent \
             --retry 3 \
             --retry-delay 10 \
             --retry-all-errors \
-            --max-time 240 \
+            --max-time 420 \
             --request POST \
             --header "X-DiamondMind-Cron: $DIAMONDMIND_CRON_SECRET" \
-            "https://diamondmind-api.onrender.com/api/v1/jobs/npb-auto-publish"
+            "https://diamondmind-api.onrender.com/api/v1/jobs/npb-auto-publish")
+
+          echo "$response"
+          echo "$response" | grep -q '"ok":true'
